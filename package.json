@@ -1,0 +1,38 @@
+{
+  "name": "promotions-service",
+  "version": "1.0.0",
+  "description": "Promotions microservice for e-commerce platform",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --env-file=.env --watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@innovabound-ecomm-platform/promotions-db": "workspace:*",
+    "@innovabound-ecomm-platform/kafka-client": "workspace:*",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^5.0.3",
+    "uuid": "^11.1.0",
+    "zod": "^3.25.36"
+  },
+  "devDependencies": {
+    "@innovabound-ecomm-platform/eslint-config": "workspace:*",
+    "@innovabound-ecomm-platform/types": "workspace:*",
+    "@innovabound-ecomm-platform/typescript-config": "workspace:*",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^9.34.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0"
+  }
+}
