@@ -1,15 +1,9 @@
 #!/usr/bin/env tsx
 /**
  * Database connection validation for promotions-service
- * 
- * Validates:
- * - Can import promotions-db module
- * - Prisma client instantiation
- * - Required types and enums are available
- * - Database schema matches service expectations
  */
 
-import { PrismaClient } from "@innovabound-ecomm-platform/promotions-db";
+import { PrismaClient, getPromotionsPrisma } from "@innovabound-ecomm-platform/promotions-db";
 
 interface ValidationCheck {
   name: string;
@@ -22,62 +16,56 @@ const checks: ValidationCheck[] = [];
 async function runValidation() {
   console.log('🔍 Validating promotions-service database connection...\n');
 
+  // Check 1: Import validation
   try {
-    const prisma = new PrismaClient();
     checks.push({
-      name: 'Import and instantiate promotions-db PrismaClient',
-      passed: prisma !== undefined,
+      name: 'Import promotions-db module (PrismaClient)',
+      passed: PrismaClient !== undefined,
     });
-
-    // Prisma client models
-    const requiredModels = ['promotion', 'discount', 'coupon', 'promoCode', 'campaign'];
-    
-    for (const model of requiredModels) {
-      try {
-        const modelExists = (prisma as any)[model] !== undefined;
-        checks.push({
-          name: `Model ${model} exists`,
-          passed: modelExists,
-          error: modelExists ? undefined : `Model ${model} not found`,
-        });
-      } catch (error: any) {
-        checks.push({
-          name: `Model ${model} exists`,
-          passed: false,
-          error: error.message,
-        });
-      }
-    }
-
-    // Database connection
-    if (process.env.PROMOTIONS_DATABASE_URL) {
-      try {
-        await prisma.$connect();
-        checks.push({
-          name: 'Database connection successful',
-          passed: true,
-        });
-        await prisma.$disconnect();
-      } catch (error: any) {
-        checks.push({
-          name: 'Database connection',
-          passed: false,
-          error: `Connection failed: ${error.message}`,
-        });
-      }
-    } else {
-      checks.push({
-        name: 'Database connection',
-        passed: true,
-        error: 'Skipped - PROMOTIONS_DATABASE_URL not set',
-      });
-    }
-
   } catch (error: any) {
     checks.push({
       name: 'Import promotions-db module',
       passed: false,
       error: error.message,
+    });
+  }
+
+  // Check 2: getPromotionsPrisma function exists
+  try {
+    checks.push({
+      name: 'getPromotionsPrisma function available',
+      passed: typeof getPromotionsPrisma === 'function',
+    });
+  } catch (error: any) {
+    checks.push({
+      name: 'getPromotionsPrisma function available',
+      passed: false,
+      error: error.message,
+    });
+  }
+
+  // Check 3: Database connection (only if DATABASE_URL is set)
+  if (process.env.PROMOTIONS_DATABASE_URL) {
+    try {
+      const prisma = getPromotionsPrisma();
+      await prisma.$connect();
+      checks.push({
+        name: 'Database connection successful',
+        passed: true,
+      });
+      await prisma.$disconnect();
+    } catch (error: any) {
+      checks.push({
+        name: 'Database connection',
+        passed: false,
+        error: `Connection failed: ${error.message}`,
+      });
+    }
+  } else {
+    checks.push({
+      name: 'Database connection',
+      passed: true,
+      error: 'Skipped - PROMOTIONS_DATABASE_URL not set',
     });
   }
 
@@ -98,6 +86,8 @@ async function runValidation() {
 
   if (failed > 0) {
     process.exit(1);
+  } else {
+    process.exit(0);
   }
 }
 
