@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { PrismaClient } from "@innovabound-ecomm-platform/promotions-db";
+import { getPromotionsPrisma } from "@innovabound-ecomm-platform/promotions-db";
 import { v4 as uuidv4 } from "uuid";
 import { requireAuth, requirePermission, AuthenticatedRequest } from "../middleware/auth";
 import { createGiftCardSchema, redeemGiftCardSchema } from "../schemas/promotion.schema";
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPromotionsPrisma();
 
 /**
  * Generate a gift card code
@@ -244,7 +244,7 @@ router.get(
   requirePermission("gift-cards:read"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
 
       const giftCard = await prisma.giftCard.findFirst({
         where: {
@@ -384,7 +384,7 @@ router.post(
   requirePermission("gift-cards:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
       const adminId = req.user!.id;
 
       const giftCard = await prisma.giftCard.update({
@@ -414,7 +414,7 @@ router.post(
   requirePermission("gift-cards:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
       const adminId = req.user!.id;
 
       const giftCard = await prisma.giftCard.update({
@@ -443,7 +443,7 @@ router.post(
   requirePermission("gift-cards:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
       const adminId = req.user!.id;
       const { amount, description } = req.body;
 

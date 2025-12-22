@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { PrismaClient } from "@innovabound-ecomm-platform/promotions-db";
+import { getPromotionsPrisma } from "@innovabound-ecomm-platform/promotions-db";
 import { v4 as uuidv4 } from "uuid";
 import { requireAuth, requirePermission, optionalAuth, AuthenticatedRequest } from "../middleware/auth";
 import { createCouponSchema, updateCouponSchema, validateCouponSchema } from "../schemas/promotion.schema";
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPromotionsPrisma();
 
 /**
  * Generate a random coupon code
@@ -247,7 +247,7 @@ router.get(
   requirePermission("coupons:read"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { code } = req.params;
+      const code = req.params.code!;
 
       const coupon = await prisma.coupon.findUnique({
         where: { code: code.toUpperCase() },
@@ -387,7 +387,7 @@ router.put(
   requirePermission("coupons:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { code } = req.params;
+      const code = req.params.code!;
       const adminId = req.user!.id;
       const validation = updateCouponSchema.safeParse(req.body);
       
@@ -424,7 +424,7 @@ router.delete(
   requirePermission("coupons:delete"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { code } = req.params;
+      const code = req.params.code!;
 
       await prisma.coupon.delete({
         where: { code: code.toUpperCase() },
@@ -451,7 +451,7 @@ router.post(
   requirePermission("coupons:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { code } = req.params;
+      const code = req.params.code!;
       const adminId = req.user!.id;
 
       const coupon = await prisma.coupon.update({

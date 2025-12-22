@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { PrismaClient, Prisma } from "@innovabound-ecomm-platform/promotions-db";
+import { getPromotionsPrisma, Prisma } from "@innovabound-ecomm-platform/promotions-db";
 import { requireAuth, requirePermission, AuthenticatedRequest } from "../middleware/auth";
 import { createPromotionSchema, updatePromotionSchema, createConditionSchema } from "../schemas/promotion.schema";
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPromotionsPrisma();
 
 // ============================================
 // PUBLIC ROUTES
@@ -132,7 +132,7 @@ router.get(
   requirePermission("promotions:read"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
 
       const promotion = await prisma.promotion.findFirst({
         where: {
@@ -216,7 +216,7 @@ router.put(
   requirePermission("promotions:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
       const adminId = req.user!.id;
       const validation = updatePromotionSchema.safeParse(req.body);
       
@@ -254,7 +254,7 @@ router.delete(
   requirePermission("promotions:delete"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
 
       await prisma.promotion.update({
         where: { id: parseInt(id, 10) },
@@ -289,7 +289,7 @@ router.post(
   requirePermission("promotions:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
       const adminId = req.user!.id;
 
       const promotion = await prisma.promotion.update({
@@ -320,7 +320,7 @@ router.post(
   requirePermission("promotions:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
       const adminId = req.user!.id;
 
       const promotion = await prisma.promotion.update({
@@ -349,7 +349,7 @@ router.post(
   requirePermission("promotions:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
       const adminId = req.user!.id;
 
       const promotion = await prisma.promotion.update({
@@ -382,7 +382,7 @@ router.post(
   requirePermission("promotions:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
       const adminId = req.user!.id;
       const validation = createConditionSchema.safeParse(req.body);
       
@@ -416,7 +416,7 @@ router.delete(
   requirePermission("promotions:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { conditionId } = req.params;
+      const conditionId = req.params.conditionId!;
 
       await prisma.promotionCondition.delete({
         where: { id: parseInt(conditionId, 10) },
@@ -447,7 +447,7 @@ router.get(
   requirePermission("promotions:read"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id!;
       const { page = "1", limit = "50" } = req.query;
 
       const pageNum = parseInt(page as string, 10);

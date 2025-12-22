@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { PrismaClient } from "@innovabound-ecomm-platform/promotions-db";
+import { getPromotionsPrisma } from "@innovabound-ecomm-platform/promotions-db";
 import { requireAuth, requirePermission, AuthenticatedRequest } from "../middleware/auth";
 import { creditWalletSchema, debitWalletSchema } from "../schemas/promotion.schema";
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPromotionsPrisma();
 
 // ============================================
 // USER ROUTES
