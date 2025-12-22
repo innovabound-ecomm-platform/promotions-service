@@ -5,6 +5,7 @@ import promotionRouter from "./routes/promotion.route";
 import couponRouter from "./routes/coupon.route";
 import giftCardRouter from "./routes/giftcard.route";
 import walletRouter from "./routes/wallet.route";
+import analyticsRouter from "./routes/analytics.route";
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use("/promotions", promotionRouter);
 app.use("/coupons", couponRouter);
 app.use("/gift-cards", giftCardRouter);
 app.use("/wallets", walletRouter);
+app.use("/analytics", analyticsRouter);
 
 // Error handler
 app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {

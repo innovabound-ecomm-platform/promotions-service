@@ -434,6 +434,181 @@ router.delete(
 );
 
 // ============================================
+// PROMOTION TARGETING
+// ============================================
+
+/**
+ * GET /promotions/:id/targeting
+ * Get promotion targeting rules
+ */
+router.get(
+  "/:id/targeting",
+  requireAuth,
+  requirePermission("promotions:read"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = req.params.id!;
+
+      const targeting = await prisma.promotionTargeting.findMany({
+        where: { promotionId: parseInt(id, 10) },
+        orderBy: { targetType: "asc" },
+      });
+
+      // Group by type for easier consumption
+      const grouped = targeting.reduce((acc, t) => {
+        const key = t.isExclusion ? `exclude_${t.targetType}` : t.targetType;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(t.targetId);
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      return res.status(200).json({
+        data: targeting,
+        grouped,
+      });
+    } catch (error) {
+      console.error("Error fetching targeting:", error);
+      return res.status(500).json({ error: "Failed to fetch targeting" });
+    }
+  }
+);
+
+/**
+ * POST /promotions/:id/targeting
+ * Add targeting rule to promotion
+ */
+router.post(
+  "/:id/targeting",
+  requireAuth,
+  requirePermission("promotions:write"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = req.params.id!;
+      const adminId = req.user!.id;
+      const { targetType, targetId, isExclusion = false } = req.body;
+
+      if (!targetType || !targetId) {
+        return res.status(400).json({ error: "targetType and targetId are required" });
+      }
+
+      const targeting = await prisma.promotionTargeting.create({
+        data: {
+          promotionId: parseInt(id, 10),
+          targetType,
+          targetId,
+          isExclusion,
+          createdBy: adminId,
+        },
+      });
+
+      return res.status(201).json(targeting);
+    } catch (error: any) {
+      if (error.code === "P2002") {
+        return res.status(400).json({ error: "This targeting rule already exists" });
+      }
+      console.error("Error creating targeting:", error);
+      return res.status(500).json({ error: "Failed to create targeting" });
+    }
+  }
+);
+
+/**
+ * POST /promotions/:id/targeting/bulk
+ * Add multiple targeting rules
+ */
+router.post(
+  "/:id/targeting/bulk",
+  requireAuth,
+  requirePermission("promotions:write"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = req.params.id!;
+      const adminId = req.user!.id;
+      const { rules } = req.body;
+
+      if (!Array.isArray(rules) || rules.length === 0) {
+        return res.status(400).json({ error: "rules array is required" });
+      }
+
+      const data = rules.map((rule: any) => ({
+        promotionId: parseInt(id, 10),
+        targetType: rule.targetType,
+        targetId: rule.targetId,
+        isExclusion: rule.isExclusion || false,
+        createdBy: adminId,
+      }));
+
+      const result = await prisma.promotionTargeting.createMany({
+        data,
+        skipDuplicates: true,
+      });
+
+      return res.status(201).json({
+        success: true,
+        created: result.count,
+      });
+    } catch (error) {
+      console.error("Error creating bulk targeting:", error);
+      return res.status(500).json({ error: "Failed to create targeting rules" });
+    }
+  }
+);
+
+/**
+ * DELETE /promotions/:id/targeting/:targetingId
+ * Remove targeting rule
+ */
+router.delete(
+  "/:id/targeting/:targetingId",
+  requireAuth,
+  requirePermission("promotions:write"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const targetingId = req.params.targetingId!;
+
+      await prisma.promotionTargeting.delete({
+        where: { id: parseInt(targetingId, 10) },
+      });
+
+      return res.status(200).json({ 
+        success: true, 
+        message: "Targeting rule deleted" 
+      });
+    } catch (error) {
+      console.error("Error deleting targeting:", error);
+      return res.status(500).json({ error: "Failed to delete targeting" });
+    }
+  }
+);
+
+/**
+ * DELETE /promotions/:id/targeting
+ * Clear all targeting rules for a promotion
+ */
+router.delete(
+  "/:id/targeting",
+  requireAuth,
+  requirePermission("promotions:write"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = req.params.id!;
+
+      const result = await prisma.promotionTargeting.deleteMany({
+        where: { promotionId: parseInt(id, 10) },
+      });
+
+      return res.status(200).json({ 
+        success: true, 
+        deleted: result.count,
+      });
+    } catch (error) {
+      console.error("Error clearing targeting:", error);
+      return res.status(500).json({ error: "Failed to clear targeting" });
+    }
+  }
+);
+
+// ============================================
 // PROMOTION USAGE/ANALYTICS
 // ============================================
 
