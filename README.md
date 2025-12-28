@@ -53,7 +53,7 @@ pnpm dev
 ## Environment Variables
 
 ```env
-PORT=3009
+PORT=3012
 DATABASE_URL=postgresql://...
 KAFKA_BROKERS=localhost:9092
 ```
