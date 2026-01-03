@@ -3,7 +3,7 @@ import { getPromotionsPrisma, Prisma } from "@innovabound-ecomm-platform/promoti
 import { requireAuth, requirePermission, AuthenticatedRequest } from "../middleware/auth";
 import { createPromotionSchema, updatePromotionSchema, createConditionSchema } from "../schemas/promotion.schema";
 
-const router = Router();
+const router: Router = Router();
 const prisma = getPromotionsPrisma();
 
 // ============================================

@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { requireAuth, requirePermission, optionalAuth, AuthenticatedRequest } from "../middleware/auth";
 import { createCouponSchema, updateCouponSchema, validateCouponSchema } from "../schemas/promotion.schema";
 
-const router = Router();
+const router: Router = Router();
 const prisma = getPromotionsPrisma();
 
 /**

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { getPromotionsPrisma, Prisma } from "@innovabound-ecomm-platform/promotions-db";
 import { requireAuth, requirePermission, AuthenticatedRequest } from "../middleware/auth";
 
-const router = Router();
+const router: Router = Router();
 const prisma = getPromotionsPrisma();
 
 // ============================================

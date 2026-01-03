@@ -22,6 +22,8 @@
     "cors": "^2.8.5",
     "express": "^5.0.3",
     "jose": "^6.0.11",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0",
     "zod": "^3.25.36"
   },
@@ -32,6 +34,8 @@
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.7",
     "@types/uuid": "^10.0.0",
     "eslint": "^9.34.0",
     "tsx": "^4.19.0",
