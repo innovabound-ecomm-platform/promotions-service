@@ -28,8 +28,29 @@ function generateGiftCardCode(): string {
 // ============================================
 
 /**
- * GET /gift-cards/check/:code
- * Check gift card balance (public)
+ * @openapi
+ * /gift-cards/check/{code}:
+ *   get:
+ *     summary: Check gift card balance
+ *     description: Check the current balance and status of a gift card (public)
+ *     tags:
+ *       - Gift Cards
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Gift card code
+ *     responses:
+ *       200:
+ *         description: Gift card balance information
+ *       400:
+ *         description: Gift card cancelled or expired
+ *       404:
+ *         description: Gift card not found
+ *       500:
+ *         description: Server error
  */
 router.get("/check/:code", async (req, res) => {
   try {
@@ -71,8 +92,50 @@ router.get("/check/:code", async (req, res) => {
 });
 
 /**
- * POST /gift-cards/redeem
- * Redeem gift card for order
+ * @openapi
+ * /gift-cards/redeem:
+ *   post:
+ *     summary: Redeem gift card
+ *     description: Apply gift card balance to an order
+ *     tags:
+ *       - Gift Cards
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *               - amount
+ *               - orderId
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: Gift card code
+ *               pin:
+ *                 type: string
+ *                 description: Gift card PIN (if required)
+ *               amount:
+ *                 type: integer
+ *                 description: Amount to redeem in cents
+ *               orderId:
+ *                 type: string
+ *                 description: Order ID for redemption
+ *     responses:
+ *       200:
+ *         description: Gift card redeemed successfully
+ *       400:
+ *         description: Invalid PIN, insufficient balance, or card status
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Gift card not found
+ *       500:
+ *         description: Server error
  */
 router.post("/redeem", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
@@ -175,8 +238,47 @@ router.post("/redeem", requireAuth, async (req: AuthenticatedRequest, res) => {
 // ============================================
 
 /**
- * GET /gift-cards
- * List all gift cards (admin)
+ * @openapi
+ * /gift-cards:
+ *   get:
+ *     summary: List all gift cards
+ *     description: Retrieve paginated list of gift cards with filtering (admin)
+ *     tags:
+ *       - Gift Cards
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           maximum: 100
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [PENDING, ACTIVE, PARTIALLY_USED, DEPLETED, EXPIRED, CANCELLED]
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by code, email, or recipient name
+ *     responses:
+ *       200:
+ *         description: List of gift cards with pagination
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/",
@@ -235,8 +337,34 @@ router.get(
 );
 
 /**
- * GET /gift-cards/:id
- * Get gift card by ID (admin)
+ * @openapi
+ * /gift-cards/{id}:
+ *   get:
+ *     summary: Get gift card by ID
+ *     description: Retrieve detailed information about a specific gift card (admin)
+ *     tags:
+ *       - Gift Cards
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Gift card ID, UUID, or code
+ *     responses:
+ *       200:
+ *         description: Gift card details with transaction history
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       404:
+ *         description: Gift card not found
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/:id",
@@ -274,8 +402,55 @@ router.get(
 );
 
 /**
- * POST /gift-cards
- * Create a new gift card
+ * @openapi
+ * /gift-cards:
+ *   post:
+ *     summary: Create gift card
+ *     description: Create a new gift card with optional code (admin)
+ *     tags:
+ *       - Gift Cards
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - initialValue
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: Custom code (auto-generated if not provided)
+ *               initialValue:
+ *                 type: integer
+ *                 description: Initial value in cents
+ *               currency:
+ *                 type: string
+ *                 default: USD
+ *               pin:
+ *                 type: string
+ *                 description: Optional PIN for security
+ *               purchasedForEmail:
+ *                 type: string
+ *               recipientName:
+ *                 type: string
+ *               expiresAt:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       201:
+ *         description: Gift card created
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/",
@@ -320,8 +495,49 @@ router.post(
 );
 
 /**
- * POST /gift-cards/bulk
- * Generate multiple gift cards
+ * @openapi
+ * /gift-cards/bulk:
+ *   post:
+ *     summary: Generate bulk gift cards
+ *     description: Generate multiple gift cards at once (admin)
+ *     tags:
+ *       - Gift Cards
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - initialValue
+ *             properties:
+ *               count:
+ *                 type: integer
+ *                 default: 10
+ *                 minimum: 1
+ *                 maximum: 100
+ *               initialValue:
+ *                 type: integer
+ *               currency:
+ *                 type: string
+ *                 default: USD
+ *               expiresAt:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       201:
+ *         description: Bulk gift cards created
+ *       400:
+ *         description: Invalid parameters
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/bulk",
@@ -375,8 +591,31 @@ router.post(
 );
 
 /**
- * POST /gift-cards/:id/activate
- * Activate a gift card
+ * @openapi
+ * /gift-cards/{id}/activate:
+ *   post:
+ *     summary: Activate gift card
+ *     description: Activate a pending gift card (admin)
+ *     tags:
+ *       - Gift Cards
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Gift card activated
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:id/activate",
@@ -405,8 +644,31 @@ router.post(
 );
 
 /**
- * POST /gift-cards/:id/cancel
- * Cancel a gift card
+ * @openapi
+ * /gift-cards/{id}/cancel:
+ *   post:
+ *     summary: Cancel gift card
+ *     description: Cancel a gift card (admin)
+ *     tags:
+ *       - Gift Cards
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Gift card cancelled
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:id/cancel",
@@ -434,8 +696,50 @@ router.post(
 );
 
 /**
- * POST /gift-cards/:id/adjust
- * Manually adjust gift card balance
+ * @openapi
+ * /gift-cards/{id}/adjust:
+ *   post:
+ *     summary: Adjust gift card balance
+ *     description: Manually adjust gift card balance (admin)
+ *     tags:
+ *       - Gift Cards
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 description: Amount to adjust (positive or negative)
+ *               description:
+ *                 type: string
+ *                 description: Reason for adjustment
+ *     responses:
+ *       200:
+ *         description: Gift card balance adjusted
+ *       400:
+ *         description: Invalid amount or would result in negative balance
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       404:
+ *         description: Gift card not found
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:id/adjust",

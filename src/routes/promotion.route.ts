@@ -11,8 +11,18 @@ const prisma = getPromotionsPrisma();
 // ============================================
 
 /**
- * GET /promotions/active
- * Get active auto-apply promotions
+ * @openapi
+ * /promotions/active:
+ *   get:
+ *     summary: Get active promotions
+ *     description: Retrieve currently active auto-apply promotions
+ *     tags:
+ *       - Promotions
+ *     responses:
+ *       200:
+ *         description: List of active promotions
+ *       500:
+ *         description: Server error
  */
 router.get("/active", async (req, res) => {
   try {
@@ -44,8 +54,52 @@ router.get("/active", async (req, res) => {
 // ============================================
 
 /**
- * GET /promotions
- * List all promotions (admin)
+ * @openapi
+ * /promotions:
+ *   get:
+ *     summary: List all promotions
+ *     description: Retrieve paginated list of promotions with filtering (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           maximum: 100
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [DRAFT, SCHEDULED, ACTIVE, PAUSED, ENDED, CANCELLED]
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [PERCENTAGE_OFF, FIXED_AMOUNT_OFF, FREE_SHIPPING, BUY_X_GET_Y]
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search in name and description
+ *     responses:
+ *       200:
+ *         description: List of promotions with pagination
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/",
@@ -123,8 +177,34 @@ router.get(
 );
 
 /**
- * GET /promotions/:id
- * Get promotion by ID
+ * @openapi
+ * /promotions/{id}:
+ *   get:
+ *     summary: Get promotion by ID
+ *     description: Retrieve detailed information about a specific promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Promotion ID or UUID
+ *     responses:
+ *       200:
+ *         description: Promotion details
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       404:
+ *         description: Promotion not found
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/:id",
@@ -171,8 +251,59 @@ router.get(
 );
 
 /**
- * POST /promotions
- * Create a new promotion
+ * @openapi
+ * /promotions:
+ *   post:
+ *     summary: Create promotion
+ *     description: Create a new promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - type
+ *               - startsAt
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *                 enum: [PERCENTAGE_OFF, FIXED_AMOUNT_OFF, FREE_SHIPPING, BUY_X_GET_Y]
+ *               discountValue:
+ *                 type: integer
+ *               discountPercent:
+ *                 type: integer
+ *               startsAt:
+ *                 type: string
+ *                 format: date-time
+ *               endsAt:
+ *                 type: string
+ *                 format: date-time
+ *               autoApply:
+ *                 type: boolean
+ *               stackable:
+ *                 type: boolean
+ *     responses:
+ *       201:
+ *         description: Promotion created
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/",
@@ -207,8 +338,39 @@ router.post(
 );
 
 /**
- * PUT /promotions/:id
- * Update a promotion
+ * @openapi
+ * /promotions/{id}:
+ *   put:
+ *     summary: Update promotion
+ *     description: Update an existing promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Promotion updated
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.put(
   "/:id",
@@ -245,8 +407,31 @@ router.put(
 );
 
 /**
- * DELETE /promotions/:id
- * Soft delete a promotion
+ * @openapi
+ * /promotions/{id}:
+ *   delete:
+ *     summary: Delete promotion
+ *     description: Soft delete a promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Promotion deleted
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.delete(
   "/:id",
@@ -280,8 +465,31 @@ router.delete(
 // ============================================
 
 /**
- * POST /promotions/:id/publish
- * Publish a promotion
+ * @openapi
+ * /promotions/{id}/publish:
+ *   post:
+ *     summary: Publish promotion
+ *     description: Activate and publish a promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Promotion published
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:id/publish",
@@ -311,8 +519,31 @@ router.post(
 );
 
 /**
- * POST /promotions/:id/pause
- * Pause a promotion
+ * @openapi
+ * /promotions/{id}/pause:
+ *   post:
+ *     summary: Pause promotion
+ *     description: Temporarily pause an active promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Promotion paused
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:id/pause",
@@ -340,8 +571,31 @@ router.post(
 );
 
 /**
- * POST /promotions/:id/schedule
- * Schedule a promotion
+ * @openapi
+ * /promotions/{id}/schedule:
+ *   post:
+ *     summary: Schedule promotion
+ *     description: Set promotion to scheduled status (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Promotion scheduled
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:id/schedule",
@@ -373,8 +627,39 @@ router.post(
 // ============================================
 
 /**
- * POST /promotions/:id/conditions
- * Add condition to promotion
+ * @openapi
+ * /promotions/{id}/conditions:
+ *   post:
+ *     summary: Add promotion condition
+ *     description: Add a conditional rule to a promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       201:
+ *         description: Condition created
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:id/conditions",
@@ -407,8 +692,36 @@ router.post(
 );
 
 /**
- * DELETE /promotions/:id/conditions/:conditionId
- * Remove condition from promotion
+ * @openapi
+ * /promotions/{id}/conditions/{conditionId}:
+ *   delete:
+ *     summary: Remove promotion condition
+ *     description: Delete a condition from a promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: conditionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Condition deleted
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.delete(
   "/:id/conditions/:conditionId",
@@ -438,8 +751,31 @@ router.delete(
 // ============================================
 
 /**
- * GET /promotions/:id/targeting
- * Get promotion targeting rules
+ * @openapi
+ * /promotions/{id}/targeting:
+ *   get:
+ *     summary: Get promotion targeting rules
+ *     description: Retrieve targeting rules for a promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Targeting rules
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/:id/targeting",
@@ -474,8 +810,50 @@ router.get(
 );
 
 /**
- * POST /promotions/:id/targeting
- * Add targeting rule to promotion
+ * @openapi
+ * /promotions/{id}/targeting:
+ *   post:
+ *     summary: Add targeting rule
+ *     description: Add a targeting rule to a promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - targetType
+ *               - targetId
+ *             properties:
+ *               targetType:
+ *                 type: string
+ *               targetId:
+ *                 type: string
+ *               isExclusion:
+ *                 type: boolean
+ *                 default: false
+ *     responses:
+ *       201:
+ *         description: Targeting rule created
+ *       400:
+ *         description: Validation error or duplicate rule
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:id/targeting",
@@ -513,8 +891,53 @@ router.post(
 );
 
 /**
- * POST /promotions/:id/targeting/bulk
- * Add multiple targeting rules
+ * @openapi
+ * /promotions/{id}/targeting/bulk:
+ *   post:
+ *     summary: Add multiple targeting rules
+ *     description: Bulk add targeting rules to a promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rules
+ *             properties:
+ *               rules:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     targetType:
+ *                       type: string
+ *                     targetId:
+ *                       type: string
+ *                     isExclusion:
+ *                       type: boolean
+ *     responses:
+ *       201:
+ *         description: Targeting rules created
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:id/targeting/bulk",
@@ -555,8 +978,36 @@ router.post(
 );
 
 /**
- * DELETE /promotions/:id/targeting/:targetingId
- * Remove targeting rule
+ * @openapi
+ * /promotions/{id}/targeting/{targetingId}:
+ *   delete:
+ *     summary: Remove targeting rule
+ *     description: Delete a specific targeting rule (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: targetingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Targeting rule deleted
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.delete(
   "/:id/targeting/:targetingId",
@@ -582,8 +1033,31 @@ router.delete(
 );
 
 /**
- * DELETE /promotions/:id/targeting
- * Clear all targeting rules for a promotion
+ * @openapi
+ * /promotions/{id}/targeting:
+ *   delete:
+ *     summary: Clear all targeting rules
+ *     description: Remove all targeting rules from a promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: All targeting rules deleted
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.delete(
   "/:id/targeting",
@@ -613,8 +1087,42 @@ router.delete(
 // ============================================
 
 /**
- * GET /promotions/:id/usage
- * Get promotion usage stats
+ * @openapi
+ * /promotions/{id}/usage:
+ *   get:
+ *     summary: Get promotion usage statistics
+ *     description: Retrieve usage stats and history for a promotion (admin)
+ *     tags:
+ *       - Promotions
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           maximum: 100
+ *     responses:
+ *       200:
+ *         description: Promotion usage statistics
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/:id/usage",

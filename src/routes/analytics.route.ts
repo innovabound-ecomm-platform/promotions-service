@@ -10,8 +10,54 @@ const prisma = getPromotionsPrisma();
 // ============================================
 
 /**
- * GET /analytics/promotions/:promotionId/usages
- * Get usage history for a promotion
+ * @openapi
+ * /analytics/promotions/{promotionId}/usages:
+ *   get:
+ *     summary: Get promotion usage history
+ *     description: Retrieve detailed usage history for a specific promotion
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: promotionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           maximum: 100
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *     responses:
+ *       200:
+ *         description: Promotion usage history
+ *       400:
+ *         description: Missing promotionId
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/promotions/:promotionId/usages",
@@ -69,8 +115,54 @@ router.get(
 );
 
 /**
- * GET /analytics/coupons/:couponId/usages
- * Get usage history for a coupon
+ * @openapi
+ * /analytics/coupons/{couponId}/usages:
+ *   get:
+ *     summary: Get coupon usage history
+ *     description: Retrieve detailed usage history for a specific coupon
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: couponId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           maximum: 100
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *     responses:
+ *       200:
+ *         description: Coupon usage history
+ *       400:
+ *         description: Missing couponId
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/coupons/:couponId/usages",
@@ -132,8 +224,60 @@ router.get(
 // ============================================
 
 /**
- * GET /analytics/redemptions
- * Get all redemptions (unified view)
+ * @openapi
+ * /analytics/redemptions:
+ *   get:
+ *     summary: Get all redemptions
+ *     description: Retrieve unified view of all redemptions (promotions, coupons, gift cards, wallet)
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           maximum: 100
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [PROMOTION, COUPON, GIFT_CARD, WALLET]
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: orderId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: userId
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Redemptions list
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/redemptions",
@@ -205,8 +349,31 @@ router.get(
 );
 
 /**
- * GET /analytics/redemptions/order/:orderId
- * Get all redemptions for an order
+ * @openapi
+ * /analytics/redemptions/order/{orderId}:
+ *   get:
+ *     summary: Get order redemptions
+ *     description: Get all redemptions applied to a specific order
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order redemptions with summary
+ *       400:
+ *         description: Missing orderId
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/redemptions/order/:orderId",
@@ -248,8 +415,38 @@ router.get(
 // ============================================
 
 /**
- * GET /analytics/summary
- * Get overall promotions analytics summary
+ * @openapi
+ * /analytics/summary:
+ *   get:
+ *     summary: Get analytics summary
+ *     description: Retrieve overall promotions analytics dashboard summary
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Filter from date
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Filter to date
+ *     responses:
+ *       200:
+ *         description: Analytics summary
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/summary",
@@ -343,8 +540,42 @@ router.get(
 );
 
 /**
- * GET /analytics/top-promotions
- * Get top performing promotions
+ * @openapi
+ * /analytics/top-promotions:
+ *   get:
+ *     summary: Get top performing promotions
+ *     description: Retrieve list of best performing promotions by usage and discount amount
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           maximum: 50
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *     responses:
+ *       200:
+ *         description: Top promotions list
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/top-promotions",
@@ -397,8 +628,32 @@ router.get(
 );
 
 /**
- * GET /analytics/top-coupons
- * Get top performing coupons
+ * @openapi
+ * /analytics/top-coupons:
+ *   get:
+ *     summary: Get top performing coupons
+ *     description: Retrieve list of best performing coupons by usage and discount amount
+ *     tags:
+ *       - Analytics
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           maximum: 50
+ *     responses:
+ *       200:
+ *         description: Top coupons list
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/top-coupons",

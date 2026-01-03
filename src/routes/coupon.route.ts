@@ -24,8 +24,58 @@ function generateCouponCode(length = 8): string {
 // ============================================
 
 /**
- * POST /coupons/validate
- * Validate a coupon code
+ * @openapi
+ * /coupons/validate:
+ *   post:
+ *     summary: Validate coupon code
+ *     description: Validate a coupon code for use in an order. Checks expiration, usage limits, and eligibility.
+ *     tags:
+ *       - Coupons
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *               - cartTotal
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: Coupon code to validate
+ *               cartTotal:
+ *                 type: number
+ *                 description: Total cart amount in cents
+ *               cartItems:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       200:
+ *         description: Coupon validation result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 valid:
+ *                   type: boolean
+ *                 coupon:
+ *                   type: object
+ *                 discountAmount:
+ *                   type: number
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Validation error or coupon invalid
+ *       404:
+ *         description: Coupon not found
+ *       500:
+ *         description: Server error
  */
 router.post("/validate", optionalAuth, async (req: AuthenticatedRequest, res) => {
   try {
@@ -165,8 +215,54 @@ router.post("/validate", optionalAuth, async (req: AuthenticatedRequest, res) =>
 // ============================================
 
 /**
- * GET /coupons
- * List all coupons (admin)
+ * @openapi
+ * /coupons:
+ *   get:
+ *     summary: List all coupons
+ *     description: Retrieve paginated list of coupons with filtering options (admin)
+ *     tags:
+ *       - Coupons
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           maximum: 100
+ *         description: Items per page
+ *       - in: query
+ *         name: promotionId
+ *         schema:
+ *           type: integer
+ *         description: Filter by promotion ID
+ *       - in: query
+ *         name: isActive
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by coupon code
+ *     responses:
+ *       200:
+ *         description: List of coupons with pagination
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/",
@@ -238,8 +334,34 @@ router.get(
 );
 
 /**
- * GET /coupons/:code
- * Get coupon by code (admin)
+ * @openapi
+ * /coupons/{code}:
+ *   get:
+ *     summary: Get coupon by code
+ *     description: Retrieve detailed information about a specific coupon (admin)
+ *     tags:
+ *       - Coupons
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Coupon code
+ *     responses:
+ *       200:
+ *         description: Coupon details
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       404:
+ *         description: Coupon not found
+ *       500:
+ *         description: Server error
  */
 router.get(
   "/:code",
@@ -276,8 +398,55 @@ router.get(
 );
 
 /**
- * POST /coupons
- * Create a new coupon
+ * @openapi
+ * /coupons:
+ *   post:
+ *     summary: Create new coupon
+ *     description: Create a new discount coupon with optional code generation (admin)
+ *     tags:
+ *       - Coupons
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - promotionId
+ *             properties:
+ *               promotionId:
+ *                 type: integer
+ *                 description: ID of associated promotion
+ *               code:
+ *                 type: string
+ *                 description: Custom code (auto-generated if not provided)
+ *               totalUsageLimit:
+ *                 type: integer
+ *                 description: Maximum total uses
+ *               perUserLimit:
+ *                 type: integer
+ *                 description: Maximum uses per user
+ *               isActive:
+ *                 type: boolean
+ *                 default: true
+ *               expiresAt:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Expiration date
+ *     responses:
+ *       201:
+ *         description: Coupon created
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/",
@@ -325,8 +494,57 @@ router.post(
 );
 
 /**
- * POST /coupons/bulk
- * Generate multiple coupons
+ * @openapi
+ * /coupons/bulk:
+ *   post:
+ *     summary: Generate bulk coupons
+ *     description: Generate multiple coupons at once with same settings (admin)
+ *     tags:
+ *       - Coupons
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - promotionId
+ *             properties:
+ *               promotionId:
+ *                 type: integer
+ *                 description: ID of associated promotion
+ *               count:
+ *                 type: integer
+ *                 default: 10
+ *                 minimum: 1
+ *                 maximum: 1000
+ *                 description: Number of coupons to generate
+ *               prefix:
+ *                 type: string
+ *                 description: Prefix for generated codes
+ *               totalUsageLimit:
+ *                 type: integer
+ *               perUserLimit:
+ *                 type: integer
+ *               isActive:
+ *                 type: boolean
+ *               expiresAt:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       201:
+ *         description: Bulk coupons created
+ *       400:
+ *         description: Invalid parameters
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/bulk",
@@ -378,8 +596,51 @@ router.post(
 );
 
 /**
- * PUT /coupons/:code
- * Update a coupon
+ * @openapi
+ * /coupons/{code}:
+ *   put:
+ *     summary: Update coupon
+ *     description: Update an existing coupon's settings (admin)
+ *     tags:
+ *       - Coupons
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Coupon code
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               totalUsageLimit:
+ *                 type: integer
+ *               perUserLimit:
+ *                 type: integer
+ *               isActive:
+ *                 type: boolean
+ *               expiresAt:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Coupon updated
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.put(
   "/:code",
@@ -415,8 +676,32 @@ router.put(
 );
 
 /**
- * DELETE /coupons/:code
- * Delete a coupon
+ * @openapi
+ * /coupons/{code}:
+ *   delete:
+ *     summary: Delete coupon
+ *     description: Permanently delete a coupon (admin)
+ *     tags:
+ *       - Coupons
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Coupon code
+ *     responses:
+ *       200:
+ *         description: Coupon deleted
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.delete(
   "/:code",
@@ -442,8 +727,32 @@ router.delete(
 );
 
 /**
- * POST /coupons/:code/deactivate
- * Deactivate a coupon
+ * @openapi
+ * /coupons/{code}/deactivate:
+ *   post:
+ *     summary: Deactivate coupon
+ *     description: Deactivate a coupon without deleting it (admin)
+ *     tags:
+ *       - Coupons
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Coupon code
+ *     responses:
+ *       200:
+ *         description: Coupon deactivated
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ *       500:
+ *         description: Server error
  */
 router.post(
   "/:code/deactivate",

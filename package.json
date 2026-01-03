@@ -1,13 +1,13 @@
 {
-  "name": "promotions-service",
+  "name": "@innovabound-ecomm-platform/promotions-service",
   "version": "1.0.0",
   "description": "Promotions microservice for e-commerce platform",
-  "main": "src/index.ts",
+  "main": "dist/main.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx --env-file=.env --watch src/index.ts",
+    "dev": "tsx --env-file=.env --watch src/main.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/main.js",
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
     "validate-db": "tsx scripts/validate-db.ts"
