@@ -3,6 +3,7 @@ import { getPromotionsPrisma } from "@innovabound-ecomm-platform/promotions-db";
 import { v4 as uuidv4 } from "uuid";
 import { requireAuth, requirePermission, AuthenticatedRequest } from "../middleware/auth";
 import { createGiftCardSchema, redeemGiftCardSchema } from "../schemas/promotion.schema";
+import { getSiteId, requireSiteId, giftCardWhere, withSiteId } from "../utils/tenant.utils";
 
 const router: Router = Router();
 const prisma = getPromotionsPrisma();
@@ -55,9 +56,10 @@ function generateGiftCardCode(): string {
 router.get("/check/:code", async (req, res) => {
   try {
     const { code } = req.params;
+    const siteId = getSiteId(req);
 
-    const giftCard = await prisma.giftCard.findUnique({
-      where: { code: code.toUpperCase().replace(/\s/g, "") },
+    const giftCard = await prisma.giftCard.findFirst({
+      where: giftCardWhere(siteId, { code: code.toUpperCase().replace(/\s/g, "") }, { strict: false }),
       select: {
         uuid: true,
         currentBalance: true,
@@ -147,9 +149,10 @@ router.post("/redeem", requireAuth, async (req: AuthenticatedRequest, res) => {
     }
 
     const { code, pin, amount, orderId } = validation.data;
+    const siteId = getSiteId(req);
 
-    const giftCard = await prisma.giftCard.findUnique({
-      where: { code: code.toUpperCase().replace(/\s/g, "") },
+    const giftCard = await prisma.giftCard.findFirst({
+      where: giftCardWhere(siteId, { code: code.toUpperCase().replace(/\s/g, "") }, { strict: false }),
     });
 
     if (!giftCard) {
@@ -192,7 +195,7 @@ router.post("/redeem", requireAuth, async (req: AuthenticatedRequest, res) => {
         },
       }),
       prisma.giftCardTransaction.create({
-        data: {
+        data: withSiteId({
           giftCardId: giftCard.id,
           amount: -amount,
           balanceAfter: newBalance,
@@ -202,13 +205,13 @@ router.post("/redeem", requireAuth, async (req: AuthenticatedRequest, res) => {
           actorUserId: userId,
           actorType: "USER",
           createdBy: userId,
-        },
+        }, siteId),
       }),
     ]);
 
     // Record redemption for analytics
     await prisma.promotionRedemption.create({
-      data: {
+      data: withSiteId({
         type: "GIFT_CARD",
         giftCardId: giftCard.id,
         orderId,
@@ -218,7 +221,7 @@ router.post("/redeem", requireAuth, async (req: AuthenticatedRequest, res) => {
         actorUserId: userId,
         actorType: "USER",
         createdBy: userId,
-      },
+      }, siteId),
     });
 
     return res.status(200).json({
@@ -295,20 +298,23 @@ router.get(
 
       const pageNum = parseInt(page as string, 10);
       const limitNum = Math.min(parseInt(limit as string, 10), 100);
+      const siteId = getSiteId(req);
 
-      const where: any = {};
+      const additionalWhere: any = {};
 
       if (status) {
-        where.status = status;
+        additionalWhere.status = status;
       }
 
       if (search) {
-        where.OR = [
+        additionalWhere.OR = [
           { code: { contains: (search as string).toUpperCase(), mode: "insensitive" } },
           { purchasedForEmail: { contains: search as string, mode: "insensitive" } },
           { recipientName: { contains: search as string, mode: "insensitive" } },
         ];
       }
+
+      const where = giftCardWhere(siteId, additionalWhere);
 
       const [giftCards, total] = await Promise.all([
         prisma.giftCard.findMany({
@@ -373,15 +379,16 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const id = req.params.id!;
+      const siteId = getSiteId(req);
 
       const giftCard = await prisma.giftCard.findFirst({
-        where: {
+        where: giftCardWhere(siteId, {
           OR: [
             { id: parseInt(id, 10) || 0 },
             { uuid: id },
             { code: id.toUpperCase() },
           ],
-        },
+        }),
         include: {
           transactions: {
             orderBy: { createdAt: "desc" },
@@ -466,24 +473,25 @@ router.post(
       }
 
       const { code, expiresAt, ...data } = validation.data;
+      const siteId = requireSiteId(req);
       
       // Generate code if not provided
       let giftCardCode = code?.toUpperCase().replace(/\s/g, "") || generateGiftCardCode();
       
-      // Ensure unique
-      while (await prisma.giftCard.findUnique({ where: { code: giftCardCode } })) {
+      // Ensure unique within tenant
+      while (await prisma.giftCard.findFirst({ where: giftCardWhere(siteId, { code: giftCardCode }) })) {
         giftCardCode = generateGiftCardCode();
       }
 
       const giftCard = await prisma.giftCard.create({
-        data: {
+        data: withSiteId({
           ...data,
           code: giftCardCode,
           currentBalance: data.initialValue,
           status: "PENDING",
           expiresAt: expiresAt ? new Date(expiresAt) : null,
           createdBy: adminId,
-        },
+        }, siteId),
       });
 
       return res.status(201).json(giftCard);
@@ -546,6 +554,7 @@ router.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
       const { count = 10, initialValue, currency = "USD", expiresAt } = req.body;
 
       if (!initialValue || count < 1 || count > 100) {
@@ -570,6 +579,7 @@ router.post(
           status: "PENDING",
           expiresAt: expiresAt ? new Date(expiresAt) : null,
           createdBy: adminId,
+          siteId,
         });
       }
 
@@ -625,9 +635,10 @@ router.post(
     try {
       const id = req.params.id!;
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
 
       const giftCard = await prisma.giftCard.update({
-        where: { id: parseInt(id, 10) },
+        where: { id: parseInt(id, 10), siteId },
         data: {
           status: "ACTIVE",
           activatedAt: new Date(),
@@ -678,9 +689,10 @@ router.post(
     try {
       const id = req.params.id!;
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
 
       const giftCard = await prisma.giftCard.update({
-        where: { id: parseInt(id, 10) },
+        where: { id: parseInt(id, 10), siteId },
         data: {
           status: "CANCELLED",
           updatedBy: adminId,
@@ -755,8 +767,10 @@ router.post(
         return res.status(400).json({ error: "Amount is required" });
       }
 
-      const giftCard = await prisma.giftCard.findUnique({
-        where: { id: parseInt(id, 10) },
+      const siteId = requireSiteId(req);
+
+      const giftCard = await prisma.giftCard.findFirst({
+        where: giftCardWhere(siteId, { id: parseInt(id, 10) }),
       });
 
       if (!giftCard) {

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getPromotionsPrisma, Prisma } from "@innovabound-ecomm-platform/promotions-db";
 import { requireAuth, requirePermission, AuthenticatedRequest } from "../middleware/auth";
 import { createPromotionSchema, updatePromotionSchema, createConditionSchema } from "../schemas/promotion.schema";
+import { getSiteId, requireSiteId, promotionWhere, withSiteId } from "../utils/tenant.utils";
 
 const router: Router = Router();
 const prisma = getPromotionsPrisma();
@@ -27,9 +28,10 @@ const prisma = getPromotionsPrisma();
 router.get("/active", async (req, res) => {
   try {
     const now = new Date();
+    const siteId = getSiteId(req);
 
     const promotions = await prisma.promotion.findMany({
-      where: {
+      where: promotionWhere(siteId, {
         status: "ACTIVE",
         autoApply: true,
         startsAt: { lte: now },
@@ -38,7 +40,7 @@ router.get("/active", async (req, res) => {
           { endsAt: { gte: now } },
         ],
         deletedAt: null,
-      },
+      }, { strict: false }),
       orderBy: { stackingPriority: "desc" },
     });
 
@@ -118,24 +120,28 @@ router.get(
       const pageNum = parseInt(page as string, 10);
       const limitNum = Math.min(parseInt(limit as string, 10), 100);
 
-      const where: Prisma.PromotionWhereInput = {
+      const siteId = getSiteId(req);
+
+      const additionalWhere: Prisma.PromotionWhereInput = {
         deletedAt: null,
       };
 
       if (status) {
-        where.status = status as any;
+        additionalWhere.status = status as any;
       }
 
       if (type) {
-        where.type = type as any;
+        additionalWhere.type = type as any;
       }
 
       if (search) {
-        where.OR = [
+        additionalWhere.OR = [
           { name: { contains: search as string, mode: "insensitive" } },
           { description: { contains: search as string, mode: "insensitive" } },
         ];
       }
+
+      const where = promotionWhere(siteId, additionalWhere);
 
       const [promotions, total] = await Promise.all([
         prisma.promotion.findMany({
@@ -213,15 +219,16 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const id = req.params.id!;
+      const siteId = getSiteId(req);
 
       const promotion = await prisma.promotion.findFirst({
-        where: {
+        where: promotionWhere(siteId, {
           OR: [
             { id: parseInt(id, 10) || 0 },
             { uuid: id },
           ],
           deletedAt: null,
-        },
+        }),
         include: {
           coupons: true,
           conditions: {
@@ -319,14 +326,15 @@ router.post(
       }
 
       const { startsAt, endsAt, ...data } = validation.data;
+      const siteId = requireSiteId(req);
 
       const promotion = await prisma.promotion.create({
-        data: {
+        data: withSiteId({
           ...data,
           startsAt: new Date(startsAt),
           endsAt: endsAt ? new Date(endsAt) : null,
           createdBy: adminId,
-        },
+        }, siteId),
       });
 
       return res.status(201).json(promotion);
@@ -387,9 +395,10 @@ router.put(
       }
 
       const { startsAt, endsAt, ...data } = validation.data;
+      const siteId = requireSiteId(req);
 
       const promotion = await prisma.promotion.update({
-        where: { id: parseInt(id, 10) },
+        where: { id: parseInt(id, 10), siteId },
         data: {
           ...data,
           ...(startsAt && { startsAt: new Date(startsAt) }),
@@ -440,9 +449,10 @@ router.delete(
   async (req: AuthenticatedRequest, res) => {
     try {
       const id = req.params.id!;
+      const siteId = requireSiteId(req);
 
       await prisma.promotion.update({
-        where: { id: parseInt(id, 10) },
+        where: { id: parseInt(id, 10), siteId },
         data: { 
           deletedAt: new Date(),
           status: "CANCELLED",
@@ -499,9 +509,10 @@ router.post(
     try {
       const id = req.params.id!;
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
 
       const promotion = await prisma.promotion.update({
-        where: { id: parseInt(id, 10) },
+        where: { id: parseInt(id, 10), siteId },
         data: {
           status: "ACTIVE",
           publishedAt: new Date(),
@@ -553,9 +564,10 @@ router.post(
     try {
       const id = req.params.id!;
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
 
       const promotion = await prisma.promotion.update({
-        where: { id: parseInt(id, 10) },
+        where: { id: parseInt(id, 10), siteId },
         data: {
           status: "PAUSED",
           updatedBy: adminId,
@@ -605,9 +617,10 @@ router.post(
     try {
       const id = req.params.id!;
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
 
       const promotion = await prisma.promotion.update({
-        where: { id: parseInt(id, 10) },
+        where: { id: parseInt(id, 10), siteId },
         data: {
           status: "SCHEDULED",
           updatedBy: adminId,
@@ -669,10 +682,19 @@ router.post(
     try {
       const id = req.params.id!;
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
       const validation = createConditionSchema.safeParse(req.body);
       
       if (!validation.success) {
         return res.status(400).json({ error: validation.error.errors });
+      }
+
+      // Verify promotion belongs to tenant
+      const promotion = await prisma.promotion.findFirst({
+        where: { id: parseInt(id, 10), siteId },
+      });
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
       }
 
       const condition = await prisma.promotionCondition.create({
@@ -729,10 +751,20 @@ router.delete(
   requirePermission("promotions:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
+      const id = req.params.id!;
       const conditionId = req.params.conditionId!;
+      const siteId = requireSiteId(req);
+
+      // Verify promotion belongs to tenant
+      const promotion = await prisma.promotion.findFirst({
+        where: { id: parseInt(id, 10), siteId },
+      });
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
 
       await prisma.promotionCondition.delete({
-        where: { id: parseInt(conditionId, 10) },
+        where: { id: parseInt(conditionId, 10), promotionId: parseInt(id, 10) },
       });
 
       return res.status(200).json({ 
@@ -784,6 +816,15 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const id = req.params.id!;
+      const siteId = requireSiteId(req);
+
+      // Verify promotion belongs to tenant
+      const promotion = await prisma.promotion.findFirst({
+        where: { id: parseInt(id, 10), siteId },
+      });
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
 
       const targeting = await prisma.promotionTargeting.findMany({
         where: { promotionId: parseInt(id, 10) },
@@ -863,10 +904,19 @@ router.post(
     try {
       const id = req.params.id!;
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
       const { targetType, targetId, isExclusion = false } = req.body;
 
       if (!targetType || !targetId) {
         return res.status(400).json({ error: "targetType and targetId are required" });
+      }
+
+      // Verify promotion belongs to tenant
+      const promotion = await prisma.promotion.findFirst({
+        where: { id: parseInt(id, 10), siteId },
+      });
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
       }
 
       const targeting = await prisma.promotionTargeting.create({
@@ -947,10 +997,19 @@ router.post(
     try {
       const id = req.params.id!;
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
       const { rules } = req.body;
 
       if (!Array.isArray(rules) || rules.length === 0) {
         return res.status(400).json({ error: "rules array is required" });
+      }
+
+      // Verify promotion belongs to tenant
+      const promotion = await prisma.promotion.findFirst({
+        where: { id: parseInt(id, 10), siteId },
+      });
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
       }
 
       const data = rules.map((rule: any) => ({
@@ -1015,10 +1074,20 @@ router.delete(
   requirePermission("promotions:write"),
   async (req: AuthenticatedRequest, res) => {
     try {
+      const id = req.params.id!;
       const targetingId = req.params.targetingId!;
+      const siteId = requireSiteId(req);
+
+      // Verify promotion belongs to tenant
+      const promotion = await prisma.promotion.findFirst({
+        where: { id: parseInt(id, 10), siteId },
+      });
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
 
       await prisma.promotionTargeting.delete({
-        where: { id: parseInt(targetingId, 10) },
+        where: { id: parseInt(targetingId, 10), promotionId: parseInt(id, 10) },
       });
 
       return res.status(200).json({ 
@@ -1066,6 +1135,15 @@ router.delete(
   async (req: AuthenticatedRequest, res) => {
     try {
       const id = req.params.id!;
+      const siteId = requireSiteId(req);
+
+      // Verify promotion belongs to tenant
+      const promotion = await prisma.promotion.findFirst({
+        where: { id: parseInt(id, 10), siteId },
+      });
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
 
       const result = await prisma.promotionTargeting.deleteMany({
         where: { promotionId: parseInt(id, 10) },
@@ -1131,10 +1209,19 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const id = req.params.id!;
+      const siteId = requireSiteId(req);
       const { page = "1", limit = "50" } = req.query;
 
       const pageNum = parseInt(page as string, 10);
       const limitNum = Math.min(parseInt(limit as string, 10), 100);
+
+      // Verify promotion belongs to tenant
+      const promotion = await prisma.promotion.findFirst({
+        where: { id: parseInt(id, 10), siteId },
+      });
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
 
       const [usages, total, stats] = await Promise.all([
         prisma.promotionUsage.findMany({

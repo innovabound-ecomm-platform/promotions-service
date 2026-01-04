@@ -3,6 +3,7 @@ import { getPromotionsPrisma } from "@innovabound-ecomm-platform/promotions-db";
 import { v4 as uuidv4 } from "uuid";
 import { requireAuth, requirePermission, optionalAuth, AuthenticatedRequest } from "../middleware/auth";
 import { createCouponSchema, updateCouponSchema, validateCouponSchema } from "../schemas/promotion.schema";
+import { getSiteId, requireSiteId, couponWhere, withSiteId } from "../utils/tenant.utils";
 
 const router: Router = Router();
 const prisma = getPromotionsPrisma();
@@ -88,10 +89,11 @@ router.post("/validate", optionalAuth, async (req: AuthenticatedRequest, res) =>
     const { code, cartTotal, cartItems } = validation.data;
     const userId = req.user?.id;
     const now = new Date();
+    const siteId = getSiteId(req);
 
     // Find coupon
-    const coupon = await prisma.coupon.findUnique({
-      where: { code: code.toUpperCase() },
+    const coupon = await prisma.coupon.findFirst({
+      where: couponWhere(siteId, { code: code.toUpperCase() }, { strict: false }),
       include: {
         promotion: true,
       },
@@ -280,20 +282,23 @@ router.get(
 
       const pageNum = parseInt(page as string, 10);
       const limitNum = Math.min(parseInt(limit as string, 10), 100);
+      const siteId = getSiteId(req);
 
-      const where: any = {};
+      const additionalWhere: any = {};
 
       if (promotionId) {
-        where.promotionId = parseInt(promotionId as string, 10);
+        additionalWhere.promotionId = parseInt(promotionId as string, 10);
       }
 
       if (isActive !== undefined) {
-        where.isActive = isActive === "true";
+        additionalWhere.isActive = isActive === "true";
       }
 
       if (search) {
-        where.code = { contains: (search as string).toUpperCase(), mode: "insensitive" };
+        additionalWhere.code = { contains: (search as string).toUpperCase(), mode: "insensitive" };
       }
+
+      const where = couponWhere(siteId, additionalWhere);
 
       const [coupons, total] = await Promise.all([
         prisma.coupon.findMany({
@@ -370,9 +375,10 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const code = req.params.code!;
+      const siteId = getSiteId(req);
 
-      const coupon = await prisma.coupon.findUnique({
-        where: { code: code.toUpperCase() },
+      const coupon = await prisma.coupon.findFirst({
+        where: couponWhere(siteId, { code: code.toUpperCase() }),
         include: {
           promotion: true,
           _count: {
@@ -462,22 +468,23 @@ router.post(
       }
 
       const { code, expiresAt, ...data } = validation.data;
+      const siteId = requireSiteId(req);
       
       // Generate code if not provided
       let couponCode = code || generateCouponCode();
       
-      // Ensure unique
-      while (await prisma.coupon.findUnique({ where: { code: couponCode } })) {
+      // Ensure unique within tenant
+      while (await prisma.coupon.findFirst({ where: couponWhere(siteId, { code: couponCode }) })) {
         couponCode = generateCouponCode();
       }
 
       const coupon = await prisma.coupon.create({
-        data: {
+        data: withSiteId({
           ...data,
           code: couponCode,
           expiresAt: expiresAt ? new Date(expiresAt) : null,
           createdBy: adminId,
-        },
+        }, siteId),
         include: {
           promotion: {
             select: { id: true, name: true },
@@ -553,6 +560,7 @@ router.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
       const { promotionId, count = 10, prefix = "", ...settings } = req.body;
 
       if (!promotionId || count < 1 || count > 1000) {
@@ -575,6 +583,7 @@ router.post(
           ...settings,
           expiresAt: settings.expiresAt ? new Date(settings.expiresAt) : null,
           createdBy: adminId,
+          siteId,
         });
       }
 
@@ -657,9 +666,18 @@ router.put(
       }
 
       const { expiresAt, ...data } = validation.data;
+      const siteId = requireSiteId(req);
+
+      // Find coupon first to verify tenant ownership
+      const existingCoupon = await prisma.coupon.findFirst({
+        where: couponWhere(siteId, { code: code.toUpperCase() }),
+      });
+      if (!existingCoupon) {
+        return res.status(404).json({ error: "Coupon not found" });
+      }
 
       const coupon = await prisma.coupon.update({
-        where: { code: code.toUpperCase() },
+        where: { id: existingCoupon.id },
         data: {
           ...data,
           ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
@@ -710,9 +728,18 @@ router.delete(
   async (req: AuthenticatedRequest, res) => {
     try {
       const code = req.params.code!;
+      const siteId = requireSiteId(req);
+
+      // Find coupon first to verify tenant ownership
+      const existingCoupon = await prisma.coupon.findFirst({
+        where: couponWhere(siteId, { code: code.toUpperCase() }),
+      });
+      if (!existingCoupon) {
+        return res.status(404).json({ error: "Coupon not found" });
+      }
 
       await prisma.coupon.delete({
-        where: { code: code.toUpperCase() },
+        where: { id: existingCoupon.id },
       });
 
       return res.status(200).json({ 
@@ -762,9 +789,18 @@ router.post(
     try {
       const code = req.params.code!;
       const adminId = req.user!.id;
+      const siteId = requireSiteId(req);
+
+      // Find coupon first to verify tenant ownership
+      const existingCoupon = await prisma.coupon.findFirst({
+        where: couponWhere(siteId, { code: code.toUpperCase() }),
+      });
+      if (!existingCoupon) {
+        return res.status(404).json({ error: "Coupon not found" });
+      }
 
       const coupon = await prisma.coupon.update({
-        where: { code: code.toUpperCase() },
+        where: { id: existingCoupon.id },
         data: { 
           isActive: false,
           updatedBy: adminId,

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getPromotionsPrisma, Prisma } from "@innovabound-ecomm-platform/promotions-db";
 import { requireAuth, requirePermission, AuthenticatedRequest } from "../middleware/auth";
+import { getSiteId, promotionWhere, couponWhere } from "../utils/tenant.utils";
 
 const router: Router = Router();
 const prisma = getPromotionsPrisma();
@@ -73,9 +74,19 @@ router.get(
       const { page = "1", limit = "50", startDate, endDate } = req.query;
       const pageNum = parseInt(page as string, 10);
       const limitNum = Math.min(parseInt(limit as string, 10), 100);
+      const siteId = getSiteId(req);
+
+      // Verify promotion belongs to tenant
+      const promotion = await prisma.promotion.findFirst({
+        where: promotionWhere(siteId, { id: parseInt(promotionId, 10) }),
+      });
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
 
       const where: Prisma.PromotionUsageWhereInput = {
         promotionId: parseInt(promotionId, 10),
+        ...(siteId ? { siteId } : {}),
       };
 
       if (startDate || endDate) {
@@ -178,9 +189,19 @@ router.get(
       const { page = "1", limit = "50", startDate, endDate } = req.query;
       const pageNum = parseInt(page as string, 10);
       const limitNum = Math.min(parseInt(limit as string, 10), 100);
+      const siteId = getSiteId(req);
+
+      // Verify coupon belongs to tenant
+      const coupon = await prisma.coupon.findFirst({
+        where: couponWhere(siteId, { id: parseInt(couponId, 10) }),
+      });
+      if (!coupon) {
+        return res.status(404).json({ error: "Coupon not found" });
+      }
 
       const where: Prisma.CouponUsageWhereInput = {
         couponId: parseInt(couponId, 10),
+        ...(siteId ? { siteId } : {}),
       };
 
       if (startDate || endDate) {
@@ -297,6 +318,7 @@ router.get(
       
       const pageNum = parseInt(page as string, 10);
       const limitNum = Math.min(parseInt(limit as string, 10), 100);
+      const siteId = getSiteId(req);
 
       const where: Prisma.PromotionRedemptionWhereInput = {};
 
@@ -385,8 +407,10 @@ router.get(
         return res.status(400).json({ error: "orderId is required" });
       }
 
+      const siteId = getSiteId(req);
+
       const redemptions = await prisma.promotionRedemption.findMany({
-        where: { orderId },
+        where: { orderId, ...(siteId ? { siteId } : {}) },
         orderBy: { redeemedAt: "desc" },
       });
 
@@ -455,6 +479,7 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const { startDate, endDate } = req.query;
+      const siteId = getSiteId(req);
 
       const dateFilter: Prisma.DateTimeFilter | undefined = 
         startDate || endDate ? {} : undefined;
@@ -463,6 +488,8 @@ router.get(
         if (startDate) dateFilter.gte = new Date(startDate as string);
         if (endDate) dateFilter.lte = new Date(endDate as string);
       }
+
+      const tenantFilter = siteId ? { siteId } : {};
 
       const [
         activePromotions,
@@ -474,33 +501,36 @@ router.get(
         giftCardTotal,
         walletTotal,
       ] = await Promise.all([
-        prisma.promotion.count({ where: { status: "ACTIVE", deletedAt: null } }),
+        prisma.promotion.count({ where: { status: "ACTIVE", deletedAt: null, ...tenantFilter } }),
         prisma.promotionUsage.count({
-          where: dateFilter ? { appliedAt: dateFilter } : undefined,
+          where: { ...(dateFilter ? { appliedAt: dateFilter } : {}), ...tenantFilter },
         }),
         prisma.couponUsage.count({
-          where: dateFilter ? { appliedAt: dateFilter } : undefined,
+          where: { ...(dateFilter ? { appliedAt: dateFilter } : {}), ...tenantFilter },
         }),
         prisma.promotionRedemption.count({
           where: { 
             type: "GIFT_CARD",
             ...(dateFilter ? { redeemedAt: dateFilter } : {}),
+            ...tenantFilter,
           },
         }),
         prisma.promotionRedemption.count({
           where: { 
             type: "WALLET",
             ...(dateFilter ? { redeemedAt: dateFilter } : {}),
+            ...tenantFilter,
           },
         }),
         prisma.promotionUsage.aggregate({
-          where: dateFilter ? { appliedAt: dateFilter } : undefined,
+          where: { ...(dateFilter ? { appliedAt: dateFilter } : {}), ...tenantFilter },
           _sum: { discountAmount: true },
         }),
         prisma.promotionRedemption.aggregate({
           where: { 
             type: "GIFT_CARD",
             ...(dateFilter ? { redeemedAt: dateFilter } : {}),
+            ...tenantFilter,
           },
           _sum: { discountAmount: true },
         }),
@@ -508,6 +538,7 @@ router.get(
           where: { 
             type: "WALLET",
             ...(dateFilter ? { redeemedAt: dateFilter } : {}),
+            ...tenantFilter,
           },
           _sum: { discountAmount: true },
         }),
@@ -585,6 +616,7 @@ router.get(
     try {
       const { limit = "10", startDate, endDate } = req.query;
       const limitNum = Math.min(parseInt(limit as string, 10), 50);
+      const siteId = getSiteId(req);
 
       const dateFilter: Prisma.DateTimeFilter | undefined = 
         startDate || endDate ? {} : undefined;
@@ -596,7 +628,7 @@ router.get(
 
       // Get promotions with usage counts
       const promotions = await prisma.promotion.findMany({
-        where: { deletedAt: null },
+        where: promotionWhere(siteId, { deletedAt: null }),
         include: {
           _count: {
             select: { usages: true },
@@ -663,8 +695,10 @@ router.get(
     try {
       const { limit = "10" } = req.query;
       const limitNum = Math.min(parseInt(limit as string, 10), 50);
+      const siteId = getSiteId(req);
 
       const coupons = await prisma.coupon.findMany({
+        where: couponWhere(siteId, {}),
         include: {
           promotion: {
             select: { name: true },

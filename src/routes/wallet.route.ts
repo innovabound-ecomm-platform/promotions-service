@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getPromotionsPrisma } from "@innovabound-ecomm-platform/promotions-db";
 import { requireAuth, requirePermission, AuthenticatedRequest } from "../middleware/auth";
 import { creditWalletSchema, debitWalletSchema } from "../schemas/promotion.schema";
+import { getSiteId, requireSiteId, walletWhere, withSiteId } from "../utils/tenant.utils";
 
 const router: Router = Router();
 const prisma = getPromotionsPrisma();
@@ -32,18 +33,19 @@ const prisma = getPromotionsPrisma();
 router.get("/me", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.id;
+    const siteId = getSiteId(req);
 
-    let wallet = await prisma.wallet.findUnique({
-      where: { userId },
+    let wallet = await prisma.wallet.findFirst({
+      where: walletWhere(siteId, { userId }, { strict: false }),
     });
 
     // Auto-create wallet if doesn't exist
     if (!wallet) {
       wallet = await prisma.wallet.create({
-        data: {
+        data: withSiteId({
           userId,
           createdBy: userId,
-        },
+        }, siteId),
       });
     }
 
@@ -94,13 +96,14 @@ router.get("/me", requireAuth, async (req: AuthenticatedRequest, res) => {
 router.get("/me/transactions", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.id;
+    const siteId = getSiteId(req);
     const { page = "1", limit = "20" } = req.query;
 
     const pageNum = parseInt(page as string, 10);
     const limitNum = Math.min(parseInt(limit as string, 10), 50);
 
-    const wallet = await prisma.wallet.findUnique({
-      where: { userId },
+    const wallet = await prisma.wallet.findFirst({
+      where: walletWhere(siteId, { userId }, { strict: false }),
       select: { id: true },
     });
 
@@ -190,9 +193,10 @@ router.post("/debit", requireAuth, async (req: AuthenticatedRequest, res) => {
     }
 
     const { amount, orderId, description } = validation.data;
+    const siteId = getSiteId(req);
 
-    const wallet = await prisma.wallet.findUnique({
-      where: { userId },
+    const wallet = await prisma.wallet.findFirst({
+      where: walletWhere(siteId, { userId }, { strict: false }),
     });
 
     if (!wallet) {
@@ -218,7 +222,7 @@ router.post("/debit", requireAuth, async (req: AuthenticatedRequest, res) => {
         },
       }),
       prisma.walletTransaction.create({
-        data: {
+        data: withSiteId({
           walletId: wallet.id,
           type: "DEBIT",
           amount,
@@ -229,13 +233,13 @@ router.post("/debit", requireAuth, async (req: AuthenticatedRequest, res) => {
           actorUserId: userId,
           actorType: "USER",
           createdBy: userId,
-        },
+        }, siteId),
       }),
     ]);
 
     // Record redemption for analytics
     await prisma.promotionRedemption.create({
-      data: {
+      data: withSiteId({
         type: "WALLET",
         walletId: wallet.id,
         orderId,
@@ -245,7 +249,7 @@ router.post("/debit", requireAuth, async (req: AuthenticatedRequest, res) => {
         actorUserId: userId,
         actorType: "USER",
         createdBy: userId,
-      },
+      }, siteId),
     });
 
     return res.status(200).json({
@@ -322,16 +326,19 @@ router.get(
 
       const pageNum = parseInt(page as string, 10);
       const limitNum = Math.min(parseInt(limit as string, 10), 100);
+      const siteId = getSiteId(req);
 
-      const where: any = {};
+      const additionalWhere: any = {};
 
       if (search) {
-        where.userId = { contains: search as string };
+        additionalWhere.userId = { contains: search as string };
       }
 
       if (minBalance) {
-        where.balance = { gte: parseInt(minBalance as string, 10) };
+        additionalWhere.balance = { gte: parseInt(minBalance as string, 10) };
       }
+
+      const where = walletWhere(siteId, additionalWhere);
 
       const [wallets, total] = await Promise.all([
         prisma.wallet.findMany({
@@ -395,9 +402,10 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const { userId } = req.params;
+      const siteId = getSiteId(req);
 
-      const wallet = await prisma.wallet.findUnique({
-        where: { userId },
+      const wallet = await prisma.wallet.findFirst({
+        where: walletWhere(siteId, { userId }),
         include: {
           transactions: {
             orderBy: { createdAt: "desc" },
@@ -481,18 +489,19 @@ router.post(
       }
 
       const { userId, amount, description, internalNotes, expiresAt, ...refs } = validation.data;
+      const siteId = requireSiteId(req);
 
       // Get or create wallet
-      let wallet = await prisma.wallet.findUnique({
-        where: { userId },
+      let wallet = await prisma.wallet.findFirst({
+        where: walletWhere(siteId, { userId }),
       });
 
       if (!wallet) {
         wallet = await prisma.wallet.create({
-          data: {
+          data: withSiteId({
             userId,
             createdBy: adminId,
-          },
+          }, siteId),
         });
       }
 
@@ -508,7 +517,7 @@ router.post(
           },
         }),
         prisma.walletTransaction.create({
-          data: {
+          data: withSiteId({
             walletId: wallet.id,
             type: "CREDIT",
             amount,
@@ -521,7 +530,7 @@ router.post(
             actorUserId: adminId,
             actorType: "ADMIN",
             createdBy: adminId,
-          },
+          }, siteId),
         }),
       ]);
 
@@ -600,8 +609,10 @@ router.post(
         return res.status(400).json({ error: "Amount is required" });
       }
 
-      const wallet = await prisma.wallet.findUnique({
-        where: { userId },
+      const siteId = requireSiteId(req);
+
+      const wallet = await prisma.wallet.findFirst({
+        where: walletWhere(siteId, { userId }),
       });
 
       if (!wallet) {
@@ -623,7 +634,7 @@ router.post(
           },
         }),
         prisma.walletTransaction.create({
-          data: {
+          data: withSiteId({
             walletId: wallet.id,
             type: "ADJUSTMENT",
             amount: Math.abs(amount),
@@ -634,7 +645,7 @@ router.post(
             actorUserId: adminId,
             actorType: "ADMIN",
             createdBy: adminId,
-          },
+          }, siteId),
         }),
       ]);
 
